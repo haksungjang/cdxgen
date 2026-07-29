@@ -15,18 +15,32 @@ live code, and they reference an unbound `utils` identifier.
 
 ## Open items (decisions, not blockers)
 
-### 1. ~1,174 lines of orphaned JSDoc remain in `lib/helpers/utils.js`
+### 1. JSDoc stranded in the barrel — RESOLVED (was nearly a doc-loss regression)
 
-159 of 161 JSDoc blocks in `utils.js` document functions that now live in leaf modules.
-`utils.js` declares nothing itself — it is a pure re-export barrel — so those comments
-describe code that is no longer adjacent to them. In one case the mismatch was actively
-misleading: a `@returns {Object} pkgFilesMap` block sat directly above an unrelated
-`isAsciiHexCode` constant.
+The extraction scripts used in the autonomous session copied function *bodies* without
+their leading JSDoc, so all 161 doc blocks stayed behind in `utils.js` while the functions
+moved to leaf modules. Every one of the ten scripted modules was affected
+(`parsers-misc.js` 0 docs / 33 exported functions, `core-misc-b.js` 0/23, and so on). The
+earlier hand-done batches — `purl`, `spdx`, `deps`, `core-env`, `core-fs` — carried their
+docs correctly, which is why the problem was confined and easy to miss.
 
-**Not removed**, because `types/lib/helpers/utils.d.ts` currently carries some of these
-comments, so deleting them changes committed types and needs a `gen-types` regen. Worth a
-focused follow-up: it would take `utils.js` from 1,760 to roughly 600 lines with no
-behaviour change.
+Those blocks looked like harmless residue and were briefly treated as such. They were not:
+they were the **only** remaining copy of the documentation. Deleting them would have
+silently dropped the docs for ~158 public functions from both the source and the generated
+`.d.ts` surface.
+
+Resolved by harvesting each JSDoc block from pre-decomposition `0cbce22b`, matching it to
+its function by name, and inserting it above that function in whichever leaf module now
+owns it — 161 blocks relocated, 13 left alone because the target already had docs.
+Verification: **zero** functions that had a JSDoc at `0cbce22b` now lack one, and `@param`
+count across `types/lib/helpers/*.d.ts` rose from 534 to 817. `utils.js` is now a 565-line
+documented re-export barrel (`utils.d.ts` 31 lines, no `@param`), and all 20 of its
+statements were proven byte-identical before and after the comment strip.
+
+**Lesson for future batches:** a line- or brace-based extraction script must move the
+leading comment block with the declaration. Verify with a per-module ratio of
+documented-to-exported functions, not just a diff of moved bodies — a body-only diff looks
+perfectly clean while the docs quietly stay behind.
 
 ### 2. Three tests are commented out in the suite (pre-existing)
 

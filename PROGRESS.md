@@ -18,9 +18,14 @@
 | review: drop 3 dead dup consts from utils.js | (this commit) | 1,760 | 261 | 117/0, golden green |
 | D5 (split utils.poku.js) | (this commit) | 1,760 | 261 | **133/0**, golden green |
 
+| review: relocate 161 JSDoc onto leaf fns + strip barrel | ee01c17e | 565 | 261 | 133/0, golden green |
+
 ## Final state
 
-- `lib/helpers/utils.js`: 21,913 → **1,760** lines, a pure re-export barrel (92.0% reduction)
+- `lib/helpers/utils.js`: 21,913 → **565** lines, a documented re-export barrel (97.4% reduction)
+- JSDoc: 161 blocks relocated from the barrel onto their functions in the leaf modules;
+  zero functions that had docs at `0cbce22b` are now undocumented; `@param` on the
+  generated leaf `.d.ts` surface rose 534 → 817
 - `lib/helpers/utils.poku.js`: 12,422 → **95** lines, split into 16 module-mirroring test files
 - Barrel exports: **261**, name set and per-export type/arity/value byte-identical to
   pre-decomposition `0cbce22b`
