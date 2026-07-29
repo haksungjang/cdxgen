@@ -34,7 +34,16 @@ export declare const commandsExecuted: Set<any>;
 export declare function safeSpawnSync(command: string, args: string[], options: Object): Object;
 export declare const TIMEOUT_MS: number;
 export declare const MAX_BUFFER: number;
-export declare function getAllFiles(dirPath: any, pattern: any, options?: {}): any;
+/**
+ * Method to get files matching a pattern
+ *
+ * @param {string} dirPath Root directory for search
+ * @param {string} pattern Glob pattern (eg: *.gradle)
+ * @param {Object} options CLI options
+ *
+ * @returns {Array[string]} List of matched files
+ */
+export declare function getAllFiles(dirPath: string, pattern: string, options?: Object): any;
 /**
  * Method to get files matching a pattern
  *
