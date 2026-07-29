@@ -168,6 +168,7 @@ lib/helpers/source.js
 lib/helpers/spdx.js
 lib/helpers/spdxExpression.js
 lib/helpers/spdxUtils.js
+lib/helpers/state.js
 lib/helpers/table.js
 lib/helpers/traceRunner.js
 lib/helpers/unicodeScan.js
@@ -450,6 +451,8 @@ types/lib/helpers/spdxExpression.d.ts
 types/lib/helpers/spdxExpression.d.ts.map
 types/lib/helpers/spdxUtils.d.ts
 types/lib/helpers/spdxUtils.d.ts.map
+types/lib/helpers/state.d.ts
+types/lib/helpers/state.d.ts.map
 types/lib/helpers/table.d.ts
 types/lib/helpers/table.d.ts.map
 types/lib/helpers/traceRunner.d.ts

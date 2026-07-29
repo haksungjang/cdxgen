@@ -1,9 +1,10 @@
 import { collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, getJarClasses, getPomPropertiesFromMavenDir, inferJarGroupFromManifest, parseJarManifest, parsePomProperties, parsePomXml, readZipEntry, trimJarGroupSuffix } from "./deps.js";
 import { createNpmWorkspacePurl } from "./npmutils.js";
+import { dirNameStr } from "./paths.js";
 import { encodeForPurl, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, purlFromUrlString } from "./purl.js";
 import { addLicenseText, adjustLicenseInformation, findLicenseId, getKnownLicense, getLicenses, guessLicenseId, isSpdxLicenseExpression, readLicenseText } from "./spdx.js";
-import { dirNameStr } from "./paths.js";
-export { addLicenseText, adjustLicenseInformation, collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, createNpmWorkspacePurl, dirNameStr, encodeForPurl, findLicenseId, getJarClasses, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, guessLicenseId, inferJarGroupFromManifest, isSpdxLicenseExpression, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, parseJarManifest, parsePomProperties, parsePomXml, purlFromUrlString, readLicenseText, readZipEntry, trimJarGroupSuffix, };
+import { CDXGEN_VERSION, frameworksList } from "./state.js";
+export { addLicenseText, adjustLicenseInformation, CDXGEN_VERSION, collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, createNpmWorkspacePurl, dirNameStr, encodeForPurl, findLicenseId, frameworksList, getJarClasses, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, guessLicenseId, inferJarGroupFromManifest, isSpdxLicenseExpression, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, parseJarManifest, parsePomProperties, parsePomXml, purlFromUrlString, readLicenseText, readZipEntry, trimJarGroupSuffix, };
 export declare const isSecureMode: any;
 export declare let isDryRun: any;
 export declare const isNode: boolean;
@@ -74,8 +75,6 @@ export declare const commandsExecuted: Set<any>;
  * @returns {Object} spawnSync result object with status, stdout, stderr, and error fields
  */
 export declare function safeSpawnSync(command: string, args: string[], options: Object): Object;
-export declare const frameworksList: any;
-export declare const CDXGEN_VERSION: any;
 export declare const DEBUG_MODE: boolean;
 export declare const CDXGEN_SPDX_CREATED_BY: any;
 export declare const TABLE_BORDER_STYLE: string;
