@@ -5,4 +5,5 @@
 | D1 (barrel test) | 823225d8 | 18,562 | 261 | 116/1, golden green |
 | D2 (batch 5: ecosystems.js) | 6b941b11 | 16,663 | 261 | 115/2, golden green |
 | D3a (batch 6a: parsers-go.js) | 05e7ce43 | 16,076 | 261 | 115/2, golden green |
-| D3b (batch 6b: parsers-dotnet.js) | (pending) | 14,907 | 261 | 115/2, golden green |
+| D3b (batch 6b: parsers-dotnet.js) | 094a298e | 14,907 | 261 | 115/2, golden green |
+| D3c (batch 6c: parsers-rust.js) | (pending) | 13,698 | 261 | 115/2, golden green |
