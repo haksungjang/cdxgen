@@ -115,6 +115,7 @@ lib/helpers/ciParsers/jenkins.js
 lib/helpers/communityAiConfigParser.js
 lib/helpers/containerRisk.js
 lib/helpers/denoutils.js
+lib/helpers/deps.js
 lib/helpers/depsUtils.js
 lib/helpers/display.js
 lib/helpers/dosai.js
@@ -342,6 +343,8 @@ types/lib/helpers/containerRisk.d.ts
 types/lib/helpers/containerRisk.d.ts.map
 types/lib/helpers/denoutils.d.ts
 types/lib/helpers/denoutils.d.ts.map
+types/lib/helpers/deps.d.ts
+types/lib/helpers/deps.d.ts.map
 types/lib/helpers/depsUtils.d.ts
 types/lib/helpers/depsUtils.d.ts.map
 types/lib/helpers/display.d.ts
