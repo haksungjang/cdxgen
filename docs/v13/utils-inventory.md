@@ -63,15 +63,32 @@ Rationale:
 
 Proposed new files (one per batch, all under `lib/helpers/`):
 
+**Corrected order** (round-2 review): `deps` moves **before** `ecosystems` because
+the ecosystems cluster calls six functions in deps (`parsePomXml`,
+`getPomPropertiesFromMavenDir`, `parseJarManifest`, `inferJarGroupFromManifest`,
+`trimJarGroupSuffix`, `collectJarNS`), while deps→ecosystems is zero edges. With
+the original order, batch 4 (ecosystems) would import the still-monolithic
+`utils.js` while `utils.js` imports back into `ecosystems.js` — a live cycle
+across a module that does work at eval time. Each batch's outbound calls are
+checked against the tree **as it will be at that moment**, not the final graph.
+
 | Batch | New file | Theme |
 |---|---|---|
 | 1 | `lib/helpers/purl.js` | purl build/parse, version compare, conan/nix purl helpers |
 | 2 | `lib/helpers/spdx.js` | license-id normalisation, SPDX expressions, license data lookup |
-| 3 | `lib/helpers/core-helpers.js` | path/file/hash/string utils, safe wrappers, activity/dry-run/host-allowlist, env/runtime/command resolution, feature flags |
-| 4 | `lib/helpers/ecosystems.js` | the `get*Metadata` family + registry fetch helpers |
-| 5 | `lib/helpers/parsers-<ecosystem>.js` | the `parse*` family, grouped per ecosystem (see §6) |
-| 6 | `lib/helpers/deps.js` | dependency-tree assembly, component merge/dedupe, JAR namespace collection |
+| 3 | `lib/helpers/core-helpers.js` (+ `core-fs.js`) | path/file/hash/string utils, safe wrappers, activity/dry-run/host-allowlist, env/runtime/command resolution, feature flags |
+| 4 | `lib/helpers/deps.js` | dependency-tree assembly, component merge/dedupe, JAR namespace collection |
+| 5 | `lib/helpers/ecosystems.js` | the `get*Metadata` family + registry fetch helpers |
+| 6 | `lib/helpers/parsers-<ecosystem>.js` | the `parse*` family, grouped per ecosystem (see §6) |
 | 7 | `lib/helpers/core-helpers.js` (cont.) | residual core that resisted earlier classification |
+
+**Types requirement (round-2 review):** `exports["./helpers/*"]` maps `types` to
+`./types/lib/helpers/*.d.ts`, `types/` is committed, and
+`lib/packaging.poku.js` asserts every types entry exists on disk. So for every
+new `lib/helpers/*.js`, in the same commit: run `pnpm gen-types`, commit the
+generated `.d.ts` + `.d.ts.map`, regenerate `test/baseline/npm-pack-file-list.txt`
+from a clean worktree of the base branch, and run
+`pnpm exec poku lib/packaging.poku.js`.
 
 `lib/helpers/utils.js` becomes a re-export barrel preserving all 261 public
 names (kept for one major version; deprecated in `MIGRATING-TO-V13.md`).
@@ -84,66 +101,158 @@ This is the constraint that makes the split non-trivial. Every binding below is
 declared once at module scope and closed over by one or more functions. After
 the split there must remain **exactly one instance** of each.
 
-### 3a. Bindings that stay within a single cluster (safe)
+A complete scan of `utils.js` finds **37 module-level `let`/`const` bindings
+that are mutable containers or reassignable**. They fall into three groups.
+
+### 3a. Reassignable / mutated bindings that stay within a single cluster (safe)
 
 These are referenced only by functions that will land in the same target
 module, so moving the binding and its users together is a pure move.
 
 | Binding | Kind | Line | Functions that touch it (all same target) | Target |
 |---|---|---|---|---|
-| `activityLedger` | `const []` | 151 | `recordActivity` (w), `resetRecordedActivities` (w), `getRecordedActivities` (r) | core/activity |
+| `activityLedger` | `const []` | 151 | `recordActivity` (w), `resetRecordedActivities` (w — `length = 0`), `getRecordedActivities` (r — `return [...activityLedger]`) | core/activity |
 | `activityCounter` | `let` | 152 | `recordActivity` (rw), `resetRecordedActivities` (w) | core/activity |
 | `currentActivityContext` | `let` (reassigned) | 153 | `setActivityContext` (w), `resetActivityContext` (w), `recordActivity` (r) | core/activity |
 | `dryRunReadTraceState` | `const` obj | 154 | `emitActivity`, `recordObservedActivity`, `recordEnvironmentRead`, `recordSensitiveFileRead`, `recordActivity`, `resetRecordedActivities` | core/activity |
 | `isDryRun` | `export let` (reassigned) | 140 | `setDryRunMode` (w); read by `recordObservedActivity`, `recordEnvironmentRead`, `recordSensitiveFileRead`, `recordActivity`, all `safe*` wrappers, `safeSpawnSync`, and the `cdxgenAgent` hooks | core/activity |
-| `commandsExecuted` | `export Set` | 1105 | `safeSpawnSync` (w) only | core/fs |
+| `commandsExecuted` | `export Set` | 1105 | `safeSpawnSync` (w, L1499). *(Verified: `safeExtractArchive` does not reference `commandsExecuted` directly, nor call `safeSpawnSync`; the only code-level write is L1499.)* | core/fs |
 | `search_maven_org_errors` | `let` | 1700 | `extractJarArchive` (rw) only | ecosystems |
 | `get_repo_license_errors` | `let` | 1704 | `getRepoLicense` (rw) only | ecosystems |
-| `jarNSMapping_cache` | `const {}` | 1582 | `collectJarNS` (rw) only | ecosystems |
+| `jarNSMapping_cache` | `const {}` | 1582 | `collectJarNS` (rw) only | deps |
 
 > Note: `dryRunReadTraceState` is additionally guarded by a `globalThis.__cdxgenDryRunReadTraceState`
 > singleton check, so even an accidental duplicate would share the same object.
 > It stays with the activity cluster regardless.
 
+### 3a-2. `export let` command bindings — reassigned at module-eval time (L1749–1795)
+
+Each of these is `export let X = "default"; if (process.env.X) { X = process.env.X; }`
+— a declaration immediately followed by a conditional reassignment, both at
+module scope. They are safe **only if declaration and reassignment move together
+as one unit** (they occupy consecutive lines and must not be separated).
+`JAVA_CMD` (L1709, `const`), `PYTHON_CMD` (L1731, `const`), `SWIFT_CMD`
+(L1798, `const`), `RUBY_CMD` (L1800, `const`) are `const` and never reassigned —
+they move as plain constants.
+
+| Binding | Kind | Line | Reassignment | Target |
+|---|---|---|---|---|
+| `DOTNET_CMD` | `export let` | 1749 | L1750–1752 from `process.env.DOTNET_CMD` | core/env |
+| `NODE_CMD` | `export let` | 1753 | L1754–1756 from `process.env.NODE_CMD` | core/env |
+| `NPM_CMD` | `export let` | 1757 | L1758–1760 | core/env |
+| `YARN_CMD` | `export let` | 1761 | L1762–1764 | core/env |
+| `GCC_CMD` | `export let` | 1765 | L1766–1768 | core/env |
+| `RUSTC_CMD` | `export let` | 1769 | L1770–1772 | core/env |
+| `GO_CMD` | `export let` | 1773 | L1774–1776 | core/env |
+| `CARGO_CMD` | `export let` | 1777 | L1778–1780 | core/env |
+| `CLJ_CMD` | `export let` | 1783 | L1784–1786 | core/env |
+| `LEIN_CMD` | `export let` | 1788 | L1789–1791 | core/env |
+| `CDXGEN_TEMP_DIR` | `export let` | 1793 | L1794–1796 from `process.env.CDXGEN_TEMP_DIR` | core/env |
+
+All eleven land in `core-helpers.js` and are re-exported by the barrel.
+
+### 3a-3. Frozen-after-init config constants (`const Set`/`Map`, never mutated)
+
+These are populated once at module-eval time and never written again. They are
+technically mutable containers but pose no hazard: whichever module owns them
+simply declares them and others import the (read-only) reference. Listed for
+completeness so a reviewer can see "checked and safe":
+
+`DIRECTORY_DISCOVERY_NAMES` (L164), `LOCKFILE_ACTIVITY_HINTS` (L179),
+`MANIFEST_ACTIVITY_HINTS` (L257), `CERTIFICATE_FILE_EXTENSIONS` (L406),
+`KEY_FILE_EXTENSIONS` (L407), `ALLOWED_WRAPPERS` (L1119),
+`VERSION_PROBE_ARGS` (L1163), `NPM_LIFECYCLE_JS_RUNNERS` (L3064),
+`NPM_LIFECYCLE_JS_RUNNER_VALUE_OPTIONS` (L3073),
+`SENSITIVE_ENV_VAR_PATTERN` (L162, regex const),
+`POSIX_SHELL_METACHARACTERS` (L1165), `WINDOWS_SHELL_METACHARACTERS` (L1166).
+
+Plus frozen boolean/value constants: `isNode` (L143), `isBun` (L144),
+`isDeno` (L145), `isWin` (L147), `isMac` (L148), `url` (L120, `let` used only
+to compute `dirNameStr` at eval time — moves with `dirNameStr`).
+
+Each moves with the cluster that uses it; no cross-cluster hazard.
+
 ### 3b. Bindings that span clusters (require a shared owner)
 
 | Binding | Kind | Line | Problem | Proposed resolution |
 |---|---|---|---|---|
-| `metadata_cache` | `export let` **(reassigned)** | 1580 | Read/written by ecosystem funcs (`getNpmMetadata`, `getGoPkgLicense`, `getGoPkgVCSUrl`, `getNugetMetadata`) **and** reassigned (`= {}`) by `parseGoModData` (a parser). ESM forbids reassigning an imported binding, so the reassigner must live in the declaring module. | **Declare `metadata_cache` in `ecosystems.js`** alongside its primary users. Export a `_clearMetadataCache()` helper from that module. `parseGoModData` (batch 5) imports `metadata_cache` (read) + `_clearMetadataCache` and calls the helper instead of `metadata_cache = {}`. **One-line mechanical adaptation at L10788**, documented in §7. |
+| `metadata_cache` | `export let` **(reassigned)** | 1580 | Read/written by ecosystem funcs (`getNpmMetadata`, `getGoPkgLicense`, `getGoPkgVCSUrl`, `getNugetMetadata`) **and** reassigned (`= {}`) by `parseGoModData` (a parser). ESM forbids reassigning an imported binding, so the reassigner must live in the declaring module. | **Declare `metadata_cache` in `ecosystems.js`** alongside its primary users. Export a `_clearMetadataCache()` helper — **internal, NOT in the barrel's 261 public names**. `parseGoModData` (batch 6) imports `metadata_cache` (read) + `_clearMetadataCache` and calls the helper instead of `metadata_cache = {}`. **One-line mechanical adaptation at L10788**, documented in §7. |
 | `cdxgenAgent` | `export const` | 2324 | Single HTTP client instance built via `createHttpClient`. Its `beforeRequest`/`afterResponse`/`beforeError` hooks close over `isDryRun`, `remoteHostsAccessed`, `recordActivity`, `recordPolicyActivity`, `inferNetworkIntent`, `isAllowedHttpHost`, `createDryRunError`, `createBlockedHostError`, `readEnvironmentVariable`, `traceLog`. Used by ~12 ecosystem/parser funcs. Two instances ⇒ two connection pools + two caches. | **Build `cdxgenAgent` in `core-helpers.js`** (with the activity/host-allowlist cluster it closes over). Ecosystem/parser modules import the single instance from there. The D04 cassette layer intercepts inside `httpClient.js`'s `doRequest`, so replay keeps working as long as there is one agent. |
 | `remoteHostsAccessed` | `export Set` | 2249 | Written only by the `cdxgenAgent` `beforeRequest` hook; read externally by 1 importer. | Stays with `cdxgenAgent` in `core-helpers.js`. |
-| `temporaryFiles` | `const Set` | 1585 | Written by `fullScanCocoaPod` (a cocoa helper, currently core). Has a `process.on("exit", …)` cleanup handler at L1586–1592 that calls `safeExistsSync`/`safeUnlinkSync`. | The cleanup handler + binding stay in `core-helpers.js` (with the `safe*` wrappers). `fullScanCocoaPod` stays in core for batch 3 and imports the Set. Since it's a `const` Set (mutated, never reassigned), importing the reference is safe. |
+| `temporaryFiles` | `const Set` | 1585 | Written by `fullScanCocoaPod` (a cocoa helper). Has a `process.on("exit", …)` cleanup handler at L1586–1592 that calls `safeExistsSync`/`safeUnlinkSync`. | The binding + exit handler stay in **`core-fs.js`** (with the `safe*` wrappers the handler calls). `fullScanCocoaPod` (batch 7, `core-misc.js`) imports the `const` Set reference — safe because it is mutated, never reassigned. |
 
 ### 3c. Per-binding singleness guarantee (definition-of-done checklist)
 
 After the split, exactly one instance of each binding exists:
 
 - `activityLedger`, `activityCounter`, `currentActivityContext`, `isDryRun`,
-  `dryRunReadTraceState`, `commandsExecuted`, `cdxgenAgent`,
-  `remoteHostsAccessed`, `temporaryFiles` → declared once in `core-helpers.js`.
-- `metadata_cache` → declared once in `ecosystems.js`.
-- `search_maven_org_errors`, `get_repo_license_errors`, `jarNSMapping_cache`
-  → declared once in `ecosystems.js`.
+  `dryRunReadTraceState`, `cdxgenAgent`, `remoteHostsAccessed` → declared once
+  in `core-helpers.js`.
+- `commandsExecuted`, `temporaryFiles` (+ its `process.on("exit")` handler) →
+  declared once in `core-fs.js`.
+- `DOTNET_CMD` … `LEIN_CMD`, `CDXGEN_TEMP_DIR` (the 11 `export let` command
+  bindings, each with its eval-time reassignment block) → declared once in
+  `core-helpers.js`.
+- `metadata_cache` → declared once in `ecosystems.js`; `_clearMetadataCache`
+  is internal to `ecosystems.js` and **not** re-exported by the barrel.
+- `search_maven_org_errors`, `get_repo_license_errors` → declared once in
+  `ecosystems.js`.
+- `jarNSMapping_cache` → declared once in `deps.js`.
 
-The barrel (`utils.js`) re-exports these names but does **not** redeclare them.
+The barrel (`utils.js`) re-exports the public names but does **not** redeclare
+any of them.
 
 ---
 
-## 4. Hazard 2 — anticipated import cycles
+## 4. Hazard 2 — import cycles (intermediate-state analysis)
 
 ESM tolerates cycles across function declarations (hoisted) but throws
 `ReferenceError: Cannot access 'X' before initialization` when a cycle crosses a
-`const`/`class`/`let` binding used at module-evaluation time.
+`const`/`class`/`let` binding used at module-evaluation time. **The cycles that
+bite exist in the intermediate states**, where half the callees still live in
+`utils.js`. Each batch is checked against the tree as it will be at that moment.
 
-Anticipated edges after the split:
+### The cycle that forced the reorder
 
-| Edge | Risk | Mitigation |
+The ecosystems cluster calls six functions that the original plan assigned to
+`deps.js` (batch 6, *after* ecosystems):
+
+- `getMvnMetadata` → `parsePomXml`
+- `extractJarArchive` → `getPomPropertiesFromMavenDir`, `parseJarManifest`,
+  `inferJarGroupFromManifest`, `trimJarGroupSuffix`, `collectJarNS`
+
+Meanwhile, parsers still in `utils.js` call back into ecosystems (8 calls to
+`getNpmMetadata`, 7 to `getRepoLicense`, 5 to `getPyMetadata`). With the
+original order, moving ecosystems first would make `ecosystems.js` import
+`utils.js` (for the deps functions still there) while `utils.js` imports back
+into `ecosystems.js` — a live cycle across a module doing real work at eval
+time (`JSON.parse` of license data, `cdxgenAgent` construction, `*_CMD`
+assignments).
+
+`deps → ecosystems` is **zero** edges, so moving deps first eliminates the
+cycle outright. **Corrected order: purl → spdx → core → deps → ecosystems → parsers → residual.**
+
+### Per-batch outbound-call check rule
+
+Before moving each batch, compute the moved set's outbound calls. Every target
+must be either (a) inside the moved set, or (b) in an **already-extracted**
+module. If a target is still in `utils.js`, verify `utils.js` does not import
+the moved module at eval time — if it does (and the moved module reads a
+`const`/`let` from `utils.js` at eval time), **reorder rather than pushing
+through**.
+
+### Final-graph edges (all one-way, safe)
+
+| Edge | Direction | Notes |
 |---|---|---|
-| `ecosystems.js` → `core-helpers.js` (for `cdxgenAgent`, `getTmpDir`, etc.) | one-way, no cycle | safe |
-| `parsers-*.js` → `ecosystems.js` (for `metadata_cache` / `_clearMetadataCache`) | one-way if ecosystems does not import parsers | **ensure `ecosystems.js` never imports a parser**; it only calls registry HTTP endpoints |
-| `parsers-*.js` → `core-helpers.js` | one-way | safe |
-| `core-helpers.js` → `parsers`/`ecosystems`? | **must not happen** | core is a leaf; if a core helper needs a parser, that parser is mis-classified |
-| barrel `utils.js` re-exports from all new modules | the new modules must not import from the barrel (only from each other directly) | new modules import sibling files directly (`./ecosystems.js`), never `./utils.js` |
+| `purl.js` → `core-helpers.js` | one-way | purl is a leaf utility |
+| `spdx.js` → `core-helpers.js` | one-way | |
+| `core-fs.js` → `core-helpers.js` | one-way | safe wrappers use activity/dry-run state |
+| `deps.js` → `core-helpers.js` | one-way | |
+| `ecosystems.js` → `deps.js`, `core-helpers.js` | one-way | deps extracted first |
+| `parsers-*.js` → `ecosystems.js`, `deps.js`, `core-helpers.js` | one-way | all targets extracted first |
+| `core-helpers.js` → parsers/ecosystems | **must not happen** | core is a leaf |
+| barrel `utils.js` re-exports from all new modules | new modules import siblings directly, never `./utils.js` | re-exports don't access values at eval time |
 
 **Verification gate (per batch):** after creating each new module, run
 `node --input-type=module -e 'await import("./lib/helpers/<mod>.js")'` in
@@ -315,7 +424,8 @@ Legend: `callers` = number of referencing files outside utils.js.
 ## 6. Batch plan
 
 Each batch is one commit, independently green, and a pure move under
-`git diff -w --find-renames`. Order is least → most entangled.
+`git diff -w --find-renames`. **Corrected order** (round-2 review):
+`purl → spdx → core → deps → ecosystems → parsers → residual`.
 
 ### Batch 1 — `lib/helpers/purl.js` (~305 lines)
 
@@ -336,65 +446,76 @@ Exports: `isSpdxLicenseExpression`, `adjustLicenseInformation`, `getLicenses`,
 
 Depends on JSON data loaded at module scope. No mutable state.
 
-### Batch 3 — `lib/helpers/core-helpers.js` (~8,250 lines → internally sub-filed)
+### Batch 3 — `lib/helpers/core-helpers.js` + `lib/helpers/core-fs.js` (~8,250 lines → sub-filed)
 
 The activity/dry-run/host-allowlist cluster **plus** the `cdxgenAgent`
 construction **plus** safe wrappers **plus** path/file/hash/string helpers
 **plus** env/runtime/command resolution. This is the largest cluster and
-**must** be sub-split to stay under ~1,500 lines/file:
+**must** be sub-split to stay under ~1,500 lines/file. Split across multiple
+commits (one per sub-file) so each stays independently green:
 
 | Sub-file | Contents | ~lines |
 |---|---|---|
-| `core-helpers.js` | module state (§3a/3b single-instance bindings), `cdxgenAgent`, activity/dry-run/host-allowlight funcs, feature flags, `PROJECT_TYPE_ALIASES`/`PACKAGE_MANAGER_ALIASES`, runtime detection consts, `*_CMD` resolution | ~1,500 |
-| `core-fs.js` | `safeExistsSync`/`safeWriteSync`/`safeMkdirSync`/`safeMkdtempSync`/`safeRmSync`/`safeUnlinkSync`/`safeCopyFileSync`/`safeExtractArchive`, `safeSpawnSync`, `commandsExecuted`, `getAllFiles`/`getAllFilesWithIgnore`, checksum/hash helpers, `getTmpDir`/`getTimestamp` | ~1,500 |
-| `core-misc.js` | remaining misc: `convertOSQueryResults`, `buildColliderComponent`, `getCppModules`, `addEvidenceForImports`, `addEvidenceForDotnet`, cocoa/pod helpers (`fullScanCocoaPod`, `buildObjectForCocoaPod`, `executePodCommand`), python tree (`getPipFrozenTree`, `getPipTreeForPackages`, `createUVLock`), command builders (`getMavenCommand`, `getAtomCommand`, `executeAtom`, `getMillCommand`), runtime/identity helpers | ~2,000 |
+| `core-helpers.js` | module state (§3a/3b single-instance bindings), `cdxgenAgent`, activity/dry-run/host-allowlist funcs, feature flags, `PROJECT_TYPE_ALIASES`/`PACKAGE_MANAGER_ALIASES`, runtime detection consts, `*_CMD` resolution (11 `export let` + eval-time reassignment blocks, moved as units) | ~1,500 |
+| `core-fs.js` | `safeExistsSync`/`safeWriteSync`/`safeMkdirSync`/`safeMkdtempSync`/`safeRmSync`/`safeUnlinkSync`/`safeCopyFileSync`/`safeExtractArchive`, `safeSpawnSync`, `commandsExecuted`, `temporaryFiles` + its `process.on("exit")` handler, `getAllFiles`/`getAllFilesWithIgnore`, checksum/hash helpers, `getTmpDir`/`getTimestamp` | ~1,500 |
+| `core-misc-a.js` | cocoa/pod helpers (`fullScanCocoaPod`, `buildObjectForCocoaPod`, `executePodCommand`, `parsePodfileLock`/`parsePodfileTargets`/`parseCocoaDependency`), python tree (`getPipFrozenTree`, `getPipTreeForPackages`, `createUVLock`), command builders (`getMavenCommand`, `getAtomCommand`, `executeAtom`, `getMillCommand`) | ~1,400 |
+| `core-misc-b.js` | `convertOSQueryResults`, `buildColliderComponent`, `getCppModules`, `addEvidenceForImports`, `addEvidenceForDotnet`, `collectExecutables`/`collectSharedLibs`, `getRuntimeInformation`, remaining runtime/identity helpers | ~1,400 |
 
-> Batch 3 is split across multiple commits (one per sub-file) so each stays
-> independently green and reviewable. `temporaryFiles` + its `process.on("exit")`
-> handler stays in `core-fs.js` (with the safe wrappers); `fullScanCocoaPod`
-> in `core-misc.js` imports it.
+> `core-misc.js` is split into `core-misc-a.js` / `core-misc-b.js` (stated
+> reason: the combined ~2,000 lines exceeds the ~1,500 ceiling). The split
+> boundary is cocoa/pod/python-tree/command-builders vs. osquery/cpp/evidence.
 
-### Batch 4 — `lib/helpers/ecosystems.js` (~1,566 lines) ⭐ most important
-
-Exports: `getNpmMetadata`, `getMvnMetadata`, `getPyMetadata`,
-`getCratesMetadata`, `getDartMetadata`, `getNugetMetadata`,
-`getSwiftPackageMetadata`, `getRepoLicense`, `getGoPkgLicense`,
-`extractJarArchive`, `fetchPomXml`, `fetchPomXmlAsJson`, `findLocalMvnArtifact`,
-plus internals (`getGoPkgVCSUrl`, `getNugetUrl`, `queryNuget`,
-`getGoPkgComponent`/`getGoPkgUrl`/`getGoPkgFullName`, `guessPypiMatchingVersion`,
-`parseBdistMetadata`, `repoMetadataToGitHubApiUrl`/`getGithubUrlParts`/`toGitHubApiUrl`).
-
-**Owns the mutable state:** `metadata_cache` (declared here, with
-`_clearMetadataCache` helper), `search_maven_org_errors`,
-`get_repo_license_errors`, `jarNSMapping_cache`.
-
-These are D08's Rust-port targets. D04's seven cassette tests pin their
-behaviour (`hitCount > 0 && missCount === 0`). **No tidying.**
-
-### Batch 5 — `lib/helpers/parsers-<ecosystem>.js` (~9,670 lines, split per ecosystem)
-
-The `parse*` family grouped by ecosystem to keep each file < ~1,500 lines:
-
-| File | Functions | ~lines |
-|---|---|---|
-| `parsers-js.js` | `parsePkgJson`, `parsePkgLock`, `parseYarnLock`, `yarnLockToIdentMap`, `parseNodeShrinkwrap`, `parsePnpmLock`, `pnpmMetadata`, `parsePnpmWorkspace`, `parseYarnWorkspace`, `findPnpmPackagePath`, `parseBowerJson`, `parseMinJs`, `parsePackageJsonName`, `getVersionNumPnpm`→purl, npm-lifecycle internals | ~2,400 |
-| `parsers-python.js` | `parsePyProjectTomlFile`, `parsePyLockData`, `parseReqFile`/`parseReqData`, `parseReqEnvMarkers`, `parseSetupPyFile`, `parsePiplockData`, `parsePixiLockFile`, `parsePixiTomlFile`, `generatePixiLockFile`, `getPyModules`, python manifest-source internals | ~1,900 |
-| `parsers-jvm.js` | `parsePom`, `parseMavenTree`, `parseMavenTreeJson`, `parseMillDependency`, `parseCljDep`, `parseLeinDep`, `parseLeinMap`, `parseLeiningenData`, `parseEdnData`, `parseBazelActionGraph`, `parseBazelSkyframe`, `parseBazelBuild`, `parseKVDep`, maven component internals | ~1,400 |
-| `parsers-dotnet.js` | `parseCsProjData`, `parseCsProjAssetsData`, `parseCsPkgLockData`, `parsePaketLockData`, `parseCsPkgData`, `parseNuspecData`, `parseNupkg`, `getPropertyGroupTextNodes` | ~1,300 |
-| `parsers-go.js` | `parseGoModData`, `parseGoModGraph`, `parseGoListDep`, `parseGoModWhy`, `parseGosumData`, `parseGopkgData`, `parseGoVersionData`, `parseGoModulesTxt`, go internals | ~1,000 |
-| `parsers-rust.js` | `parseCargoData`, `parseCargoTomlData`, `parseCargoDependencyData`, `parseCargoManifestDependencyData`, `parseCargoAuditableData`, cargo workspace internals | ~1,400 |
-| `parsers-misc.js` | `parseComposerJson`/`parseComposerLock`, `parseCargoData`→rust, `parsePubLockData`/`parsePubYamlData`, `parseHelmYamlData`, `parseContainerFile`, `parseBitbucketPipelinesFile`, `parseContainerSpecData`, `parsePrivadoFile`, `parseOpenapiSpecData`, `parseCabalData`, `parseMixLockData`, `parseGitHubWorkflowData`, `parseCloudBuildData`, `parseConanLockData`/`parseConanData`, `parseColliderLockData`, `parseFlakeNix`/`parseFlakeLock`, `parsePodfileLock`/`parsePodfileTargets`/`parseCocoaDependency`, `parseSwiftJsonTree`/`parseSwiftResolved`/`parseSwiftJsonTreeObject`, `parseCmakeDotFile`/`parseCmakeLikeFile`, `parseMakeDFile`, `parseCUsageSlice`, `parseMavenArgs`, OS-package executors (`executeDpkgList`, etc.) | ~2,500 |
-
-> **Batch 5 is the largest and may be deferred** (see §9). Batches 1–4 are the
-> priority per the deliverable's "land fewer batches, fully" guidance.
-
-### Batch 6 — `lib/helpers/deps.js` (~501 lines)
+### Batch 4 — `lib/helpers/deps.js` (~501 lines)
 
 Exports: `collectJarNS`, `collectMvnDependencies`, `convertJarNSToPackages`,
 `componentSorter`, `flattenDeps`, plus JAR/POM helpers (`parsePomXml`,
 `parseJarManifest`, `parsePomProperties`, `getPomPropertiesFromMavenDir`,
 `inferJarGroupFromManifest`, `trimJarGroupSuffix`, `isQualifiedJarNamespace`,
 `readZipEntry`, `getJarClasses`).
+
+**Owns:** `jarNSMapping_cache`.
+
+Lands **before** ecosystems (§4 cycle fix): `deps → ecosystems` is zero edges,
+but `ecosystems → deps` has six.
+
+### Batch 5 — `lib/helpers/ecosystems.js` (~1,566 lines) ⭐ most important
+
+Exports: `getNpmMetadata`, `getMvnMetadata`, `getPyMetadata`,
+`getCratesMetadata`, `getDartMetadata`, `getNugetMetadata`,
+`getSwiftPackageMetadata`, `getRepoLicense`, `getGoPkgLicense`,
+`extractJarArchive`, `fetchPomXml`, `fetchPomXmlAsJson`, `findLocalMvnArtifact`,
+plus internals (`getGoPkgVCSUrl`, `getNugetUrl`, `queryNuget`,
+`guessPypiMatchingVersion`, `parseBdistMetadata`,
+`repoMetadataToGitHubApiUrl`/`getGithubUrlParts`/`toGitHubApiUrl`).
+
+**Five helpers added in round-2 review** (called by the ecosystems cluster;
+left behind they would be back-edges into `utils.js`): `getGoPkgUrl`,
+`getGoPkgFullName`, `mergeExternalReferences`, `collectPypiReleaseExternalReferences`,
+`normalizeCargoIntegrity`.
+
+**Owns the mutable state:** `metadata_cache` (declared here, with
+`_clearMetadataCache` helper — **internal, not in the barrel's 261 names**),
+`search_maven_org_errors`, `get_repo_license_errors`.
+
+These are D08's Rust-port targets. D04's seven cassette tests pin their
+behaviour (`hitCount > 0 && missCount === 0`). **No tidying.**
+
+### Batch 6 — `lib/helpers/parsers-<ecosystem>.js` (~9,670 lines, split per ecosystem)
+
+The `parse*` family grouped by ecosystem to keep each file < ~1,500 lines:
+
+| File | Functions | ~lines |
+|---|---|---|
+| `parsers-js.js` | `parsePkgJson`, `parsePkgLock`, `parseYarnLock`, `yarnLockToIdentMap`, `parseNodeShrinkwrap`, `parsePnpmLock`, `pnpmMetadata`, `parsePnpmWorkspace`, `parseYarnWorkspace`, `findPnpmPackagePath`, `parseBowerJson`, `parseMinJs`, `parsePackageJsonName`, npm-lifecycle internals | ~2,400 |
+| `parsers-python.js` | `parsePyProjectTomlFile`, `parsePyLockData`, `parseReqFile`/`parseReqData`, `parseReqEnvMarkers`, `parseSetupPyFile`, `parsePiplockData`, `parsePixiLockFile`, `parsePixiTomlFile`, `generatePixiLockFile`, `getPyModules`, python manifest-source internals | ~1,900 |
+| `parsers-jvm.js` | `parsePom`, `parseMavenTree`, `parseMavenTreeJson`, `parseMillDependency`, `parseCljDep`, `parseLeinDep`, `parseLeinMap`, `parseLeiningenData`, `parseEdnData`, `parseBazelActionGraph`, `parseBazelSkyframe`, `parseBazelBuild`, `parseKVDep`, maven component internals | ~1,400 |
+| `parsers-dotnet.js` | `parseCsProjData`, `parseCsProjAssetsData`, `parseCsPkgLockData`, `parsePaketLockData`, `parseCsPkgData`, `parseNuspecData`, `parseNupkg`, `getPropertyGroupTextNodes` | ~1,300 |
+| `parsers-go.js` | `parseGoModData`, `parseGoModGraph`, `parseGoListDep`, `parseGoModWhy`, `parseGosumData`, `parseGopkgData`, `parseGoVersionData`, `parseGoModulesTxt`, go internals | ~1,000 |
+| `parsers-rust.js` | `parseCargoData`, `parseCargoTomlData`, `parseCargoDependencyData`, `parseCargoManifestDependencyData`, `parseCargoAuditableData`, cargo workspace internals | ~1,400 |
+| `parsers-misc.js` | `parseComposerJson`/`parseComposerLock`, `parsePubLockData`/`parsePubYamlData`, `parseHelmYamlData`, `parseContainerFile`, `parseBitbucketPipelinesFile`, `parseContainerSpecData`, `parsePrivadoFile`, `parseOpenapiSpecData`, `parseCabalData`, `parseMixLockData`, `parseGitHubWorkflowData`, `parseCloudBuildData`, `parseConanLockData`/`parseConanData`, `parseColliderLockData`, `parseFlakeNix`/`parseFlakeLock`, `parseSwiftJsonTree`/`parseSwiftResolved`/`parseSwiftJsonTreeObject`, `parseCmakeDotFile`/`parseCmakeLikeFile`, `parseMakeDFile`, `parseCUsageSlice`, `parseMavenArgs`, OS-package executors (`executeDpkgList`, etc.) | ~2,500 |
+
+> **Batch 6 is the largest and may be deferred** (see §9). Batches 1–4 are the
+> priority per the deliverable's "land fewer batches, fully" guidance.
 
 ### Batch 7 — residual `core-helpers.js`
 
@@ -446,14 +567,18 @@ be moved as-is, with extra attention to their internal helper dependencies:
 
 ## 9. Scope statement
 
-**Priority (will land):** Batches 1, 2, 3, 4 — purl, spdx, core, ecosystems.
-These deliver the D08-enabling isolation of the `get*Metadata` family with a
-correct mutable-state split and a green corpus.
+**Priority (will land):** Batches 1–4 — purl, spdx, core, deps.
+These deliver a correct mutable-state split with a green corpus and establish
+the extraction pattern.
 
-**Best-effort (land if green and clean):** Batches 5, 6, 7 — parsers, deps,
-residual. Batch 5 in particular is ~9,670 lines across ~26 functions and may
-span multiple commits per ecosystem. If any batch cannot land cleanly without a
-behaviour change, it is deferred with a note here.
+**High-value (land if green and clean):** Batch 5 — ecosystems. This is the
+D08-enabling isolation of the `get*Metadata` family. It depends on deps (batch 4)
+being landed first. D04's cassette suite pins its behaviour.
+
+**Best-effort (land if time and clean):** Batches 6–7 — parsers, residual.
+Batch 6 is ~9,670 lines across ~84 functions and may span multiple commits per
+ecosystem. If any batch cannot land cleanly without a behaviour change, it is
+deferred with a note here.
 
 The barrel + snapshot test + `MIGRATING-TO-V13.md` deprecation note ship with
 the last batch that lands.
@@ -464,3 +589,23 @@ the last batch that lands.
 
 None observed during inventory. Any bugs discovered during the moves will be
 listed here and left unchanged per the zero-behaviour-change rule.
+
+---
+
+## 11. Reviewer notes (round-2 feedback — two claims verified as incorrect)
+
+The round-2 review contained two factual assertions about the code that do not
+hold up when checked against `utils.js` on `1ab608db`. Per the project lesson
+"verify with a command, don't assume", the original (correct) entries are kept
+and the reasoning is stated here so a reviewer can re-check:
+
+1. **"`commandsExecuted` is touched by `safeExtractArchive` as well as
+   `safeSpawnSync`"** — Verified false. `grep -n commandsExecuted` finds exactly
+   one code-level write (L1499, inside `safeSpawnSync`). `safeExtractArchive`
+   (L1049–1104) neither references `commandsExecuted` nor calls `safeSpawnSync`.
+   The table row stating "`safeSpawnSync` (w) only" is correct; both land in
+   `core-fs.js` regardless.
+2. **"`getRecordedActivities` does not reference `activityLedger`"** — Verified
+   false. The function body is `return [...activityLedger];` (L829). The table
+   row listing `getRecordedActivities` as a reader of `activityLedger` is
+   correct.
