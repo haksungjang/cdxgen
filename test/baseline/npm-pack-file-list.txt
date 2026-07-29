@@ -114,6 +114,7 @@ lib/helpers/ciParsers/gitlabCi.js
 lib/helpers/ciParsers/jenkins.js
 lib/helpers/communityAiConfigParser.js
 lib/helpers/containerRisk.js
+lib/helpers/core-activity.js
 lib/helpers/denoutils.js
 lib/helpers/deps.js
 lib/helpers/depsUtils.js
@@ -343,6 +344,8 @@ types/lib/helpers/communityAiConfigParser.d.ts
 types/lib/helpers/communityAiConfigParser.d.ts.map
 types/lib/helpers/containerRisk.d.ts
 types/lib/helpers/containerRisk.d.ts.map
+types/lib/helpers/core-activity.d.ts
+types/lib/helpers/core-activity.d.ts.map
 types/lib/helpers/denoutils.d.ts
 types/lib/helpers/denoutils.d.ts.map
 types/lib/helpers/deps.d.ts

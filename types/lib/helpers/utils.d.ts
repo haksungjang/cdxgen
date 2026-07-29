@@ -1,47 +1,16 @@
+import { BLOCKED_HOST_ERROR_CODE, cdxgenAgent, createBlockedHostError, createDryRunError, DEBUG_MODE, DRY_RUN_ERROR_CODE, getRecordedActivities, hasDangerousUnicode, isAllowedHttpHost, isDryRun, isDryRunError, isSecureMode, isSensitiveEnvironmentVariableName, readEnvironmentVariable, recordActivity, recordDecisionActivity, recordDiscoveryActivity, recordEnvironmentRead, recordObservedActivity, recordPolicyActivity, recordSensitiveFileRead, recordSymlinkResolution, remoteHostsAccessed, resetActivityContext, resetRecordedActivities, setActivityContext, setDryRunMode } from "./core-activity.js";
 import { collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, getJarClasses, getPomPropertiesFromMavenDir, inferJarGroupFromManifest, parseJarManifest, parsePomProperties, parsePomXml, readZipEntry, trimJarGroupSuffix } from "./deps.js";
 import { createNpmWorkspacePurl } from "./npmutils.js";
 import { dirNameStr } from "./paths.js";
 import { encodeForPurl, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, purlFromUrlString } from "./purl.js";
 import { addLicenseText, adjustLicenseInformation, findLicenseId, getKnownLicense, getLicenses, guessLicenseId, isSpdxLicenseExpression, readLicenseText } from "./spdx.js";
 import { CDXGEN_VERSION, frameworksList } from "./state.js";
-export { addLicenseText, adjustLicenseInformation, CDXGEN_VERSION, collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, createNpmWorkspacePurl, dirNameStr, encodeForPurl, findLicenseId, frameworksList, getJarClasses, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, guessLicenseId, inferJarGroupFromManifest, isSpdxLicenseExpression, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, parseJarManifest, parsePomProperties, parsePomXml, purlFromUrlString, readLicenseText, readZipEntry, trimJarGroupSuffix, };
-export declare const isSecureMode: any;
-export declare let isDryRun: any;
+export { addLicenseText, adjustLicenseInformation, BLOCKED_HOST_ERROR_CODE, CDXGEN_VERSION, cdxgenAgent, collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, createBlockedHostError, createDryRunError, createNpmWorkspacePurl, DEBUG_MODE, DRY_RUN_ERROR_CODE, dirNameStr, encodeForPurl, findLicenseId, frameworksList, getJarClasses, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, getRecordedActivities, guessLicenseId, hasDangerousUnicode, inferJarGroupFromManifest, isAllowedHttpHost, isDryRun, isDryRunError, isSecureMode, isSensitiveEnvironmentVariableName, isSpdxLicenseExpression, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, parseJarManifest, parsePomProperties, parsePomXml, purlFromUrlString, readEnvironmentVariable, readLicenseText, readZipEntry, recordActivity, recordDecisionActivity, recordDiscoveryActivity, recordEnvironmentRead, recordObservedActivity, recordPolicyActivity, recordSensitiveFileRead, recordSymlinkResolution, remoteHostsAccessed, resetActivityContext, resetRecordedActivities, setActivityContext, setDryRunMode, trimJarGroupSuffix, };
 export declare const isNode: boolean;
 export declare const isBun: boolean;
 export declare const isDeno: boolean;
 export declare const isWin: boolean;
 export declare const isMac: boolean;
-export declare const DRY_RUN_ERROR_CODE = "CDXGEN_DRY_RUN";
-export declare function isSensitiveEnvironmentVariableName(varName: any): boolean;
-export declare function recordObservedActivity(kind: any, target: any, options?: {}): any;
-export declare function recordDecisionActivity(target: any, options?: {}): any;
-export declare function recordDiscoveryActivity(target: any, options?: {}): any;
-export declare function recordPolicyActivity(target: any, options?: {}): any;
-export declare function recordSymlinkResolution(sourcePath: any, resolvedPath: any, options?: {}): any;
-export declare function recordEnvironmentRead(varName: any, options?: {}): any;
-export declare function recordSensitiveFileRead(filePath: any, options?: {}): any;
-export declare function readEnvironmentVariable(varName: any, options?: {}): any;
-export declare function setDryRunMode(enabled: any): void;
-export declare function createDryRunError(action: any, target: any, reason: any): Error;
-export declare function isDryRunError(error: any): boolean;
-export declare const BLOCKED_HOST_ERROR_CODE = "CDXGEN_HOST_BLOCKED";
-/**
- * Create an error used to abort a request to a host that policy disallows
- * (CDXGEN_ALLOWED_HOSTS or the secure-mode https-only restriction). The
- * beforeRequest hook must throw this so the request is actually aborted;
- * returning does not stop the request.
- *
- * @param {string} target The blocked request URL.
- * @param {string} reason Human readable reason for the block.
- * @returns {Error} Error carrying the blocked-host code.
- */
-export declare function createBlockedHostError(target: string, reason: string): Error;
-export declare function setActivityContext(context?: {}): void;
-export declare function resetActivityContext(): void;
-export declare function recordActivity(activity: any): any;
-export declare function getRecordedActivities(): any[];
-export declare function resetRecordedActivities(): void;
 /**
  * Safely check if a file path exists without crashing due to a lack of permissions
  *
@@ -75,7 +44,6 @@ export declare const commandsExecuted: Set<any>;
  * @returns {Object} spawnSync result object with status, stdout, stderr, and error fields
  */
 export declare function safeSpawnSync(command: string, args: string[], options: Object): Object;
-export declare const DEBUG_MODE: boolean;
 export declare const CDXGEN_SPDX_CREATED_BY: any;
 export declare const TABLE_BORDER_STYLE: string;
 export declare const TIMEOUT_MS: number;
@@ -232,9 +200,6 @@ export declare function getDefaultBomAuditCategories(options: object, commandPat
  * @returns {Boolean} True if the package manager is allowed
  */
 export declare function isPackageManagerAllowed(name: string, conflictingManagers: any[], options: Object): boolean;
-export declare const remoteHostsAccessed: Set<any>;
-export declare function isAllowedHttpHost(hostname: any, allowedHostsEnv?: any): boolean;
-export declare const cdxgenAgent: Function;
 /**
  * Method to get files matching a pattern
  *
@@ -1709,11 +1674,16 @@ export declare function collectSharedLibs(basePath: any, libPaths: any, ldConf: 
 export declare function getRuntimeInformation(): Object;
 /**
  * Checks for dangerous Unicode characters that could enable homograph attacks
- *
- * @param {string} str String to check
- * @returns {boolean} true if dangerous Unicode is found
- */
-export declare function hasDangerousUnicode(str: string): boolean;
+  if (zeroWidthChars.test(str)) {
+    return true;
+  }
+
+  // Check for control characters (except common ones like \n, \r, \t)
+  const controlChars = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
+  return controlChars.test(str);
+}
+// biome-ignore-end lint/suspicious/noControlCharactersInRegex: validation
+
 /**
  * Validates that a root is a legitimate Windows drive letter format
  *
