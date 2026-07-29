@@ -14,4 +14,18 @@
 | D6+D7 (docs) | 06bb26e3 | — | 261 | — |
 | D4a (batch 7a: core-misc-a.js) | ce85bc44 | 3,657 | 261 | 115/2, golden green |
 | D4b (batch 7b: core-misc-b.js) | 6689d1e4 | 1,782 | 261 | 115/2, golden green |
-| D5 (split utils.poku.js) | DEFERRED | — | — | see BLOCKERS.md |
+| review: baseline + lint + sha fix | bfeaac5b | 1,782 | 261 | **117/0**, golden green |
+| review: drop 3 dead dup consts from utils.js | (this commit) | 1,760 | 261 | 117/0, golden green |
+| D5 (split utils.poku.js) | (this commit) | 1,760 | 261 | **133/0**, golden green |
+
+## Final state
+
+- `lib/helpers/utils.js`: 21,913 → **1,760** lines, a pure re-export barrel (92.0% reduction)
+- `lib/helpers/utils.poku.js`: 12,422 → **95** lines, split into 16 module-mirroring test files
+- Barrel exports: **261**, name set and per-export type/arity/value byte-identical to
+  pre-decomposition `0cbce22b`
+- Live test cases: **247** before and after the split (6 `describe` blocks); see
+  `BLOCKERS.md` on why a `grep` count says 250
+- Gates: `pnpm test` **133/0**, `test:golden` 15/25/75/8 green, `pnpm -r test` all
+  packages 0 failed, boundaries clean, `biome check` clean, pack baseline regenerated
+
