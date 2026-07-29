@@ -149,7 +149,8 @@ they move as plain constants.
 | `LEIN_CMD` | `export let` | 1788 | L1789–1791 | core/env |
 | `CDXGEN_TEMP_DIR` | `export let` | 1793 | L1794–1796 from `process.env.CDXGEN_TEMP_DIR` | core/env |
 
-All eleven land in `core-helpers.js` and are re-exported by the barrel.
+All eleven land in `core-env.js` (the env/command-resolution leaf of the
+former `core-helpers.js` cluster) and are re-exported by the barrel.
 
 ### 3a-3. Frozen-after-init config constants (`const Set`/`Map`, never mutated)
 
@@ -187,12 +188,12 @@ After the split, exactly one instance of each binding exists:
 
 - `activityLedger`, `activityCounter`, `currentActivityContext`, `isDryRun`,
   `dryRunReadTraceState`, `cdxgenAgent`, `remoteHostsAccessed` → declared once
-  in `core-helpers.js`.
+  in `core-activity.js`.
 - `commandsExecuted`, `temporaryFiles` (+ its `process.on("exit")` handler) →
   declared once in `core-fs.js`.
 - `DOTNET_CMD` … `LEIN_CMD`, `CDXGEN_TEMP_DIR` (the 11 `export let` command
   bindings, each with its eval-time reassignment block) → declared once in
-  `core-helpers.js`.
+  `core-env.js`.
 - `metadata_cache` → declared once in `ecosystems.js`; `_clearMetadataCache`
   is internal to `ecosystems.js` and **not** re-exported by the barrel.
 - `search_maven_org_errors`, `get_repo_license_errors` → declared once in
@@ -446,7 +447,7 @@ Exports: `isSpdxLicenseExpression`, `adjustLicenseInformation`, `getLicenses`,
 
 Depends on JSON data loaded at module scope. No mutable state.
 
-### Batch 3 — `lib/helpers/core-helpers.js` + `lib/helpers/core-fs.js` (~8,250 lines → sub-filed)
+### Batch 3 — core cluster (~8,250 lines → sub-filed)
 
 The activity/dry-run/host-allowlist cluster **plus** the `cdxgenAgent`
 construction **plus** safe wrappers **plus** path/file/hash/string helpers
@@ -454,10 +455,20 @@ construction **plus** safe wrappers **plus** path/file/hash/string helpers
 **must** be sub-split to stay under ~1,500 lines/file. Split across multiple
 commits (one per sub-file) so each stays independently green:
 
+> **Rename note.** The plan originally called this single file
+> `core-helpers.js`. It never materialised as one file: during implementation
+> the cluster was decomposed into four leaf modules — `state.js`,
+> `core-activity.js`, `core-fs.js`, and `core-env.js` — plus the future
+> `core-misc-a.js` / `core-misc-b.js`. The `core-env.js` name (batches 3a/3b/3c
+> having already landed `state.js`, `core-activity.js`, `core-fs.js`) captures
+> the residual env/runtime/command-resolution/alias-table cluster.
+
 | Sub-file | Contents | ~lines |
 |---|---|---|
-| `core-helpers.js` | module state (§3a/3b single-instance bindings), `cdxgenAgent`, activity/dry-run/host-allowlist funcs, feature flags, `PROJECT_TYPE_ALIASES`/`PACKAGE_MANAGER_ALIASES`, runtime detection consts, `*_CMD` resolution (11 `export let` + eval-time reassignment blocks, moved as units) | ~1,500 |
-| `core-fs.js` | `safeExistsSync`/`safeWriteSync`/`safeMkdirSync`/`safeMkdtempSync`/`safeRmSync`/`safeUnlinkSync`/`safeCopyFileSync`/`safeExtractArchive`, `safeSpawnSync`, `commandsExecuted`, `temporaryFiles` + its `process.on("exit")` handler, `getAllFiles`/`getAllFilesWithIgnore`, checksum/hash helpers, `getTmpDir`/`getTimestamp` | ~1,500 |
+| `state.js` (batch 3a) | eval-time data constants (`frameworksList`, `CDXGEN_VERSION`, `mesonWrapDB`, `vendorAliases`, std-module tables) | ~40 |
+| `core-activity.js` (batch 3b) | module state (§3a/3b single-instance bindings), `cdxgenAgent`, activity/dry-run/host-allowlist funcs, feature flags | ~1,500 |
+| `core-fs.js` (batch 3c) | `safeExistsSync`/`safeWriteSync`/`safeMkdirSync`/`safeMkdtempSync`/`safeRmSync`/`safeUnlinkSync`/`safeCopyFileSync`/`safeExtractArchive`, `safeSpawnSync`, `commandsExecuted`, `temporaryFiles` + its `process.on("exit")` handler, `getAllFiles`/`getAllFilesWithIgnore`, checksum/hash helpers, `getTmpDir`/`getTimestamp` | ~1,500 |
+| `core-env.js` (batch 3d) | runtime detection consts (`isNode`/`isBun`/`isDeno`), env-derived flags (`CDXGEN_SPDX_CREATED_BY`, `TABLE_BORDER_STYLE`, `includeMavenTestScope`, `PREFER_MAVEN_DEPS_TREE`), fetch predicates (`shouldFetchLicense`/`shouldFetchPackageMetadata`/`shouldFetchVCS`, `FETCH_LICENSE`, `SEARCH_MAVEN_ORG`), `parseMavenArgs`, `*_CMD` resolution (`JAVA_CMD`/`PYTHON_CMD` + their getters, 11 `export let` + eval-time reassignment blocks moved as units, `SWIFT_CMD`, `RUBY_CMD`), `PROJECT_TYPE_ALIASES`/`PACKAGE_MANAGER_ALIASES`/`PYTHON_EXCLUDED_COMPONENTS` | ~400 |
 | `core-misc-a.js` | cocoa/pod helpers (`fullScanCocoaPod`, `buildObjectForCocoaPod`, `executePodCommand`, `parsePodfileLock`/`parsePodfileTargets`/`parseCocoaDependency`), python tree (`getPipFrozenTree`, `getPipTreeForPackages`, `createUVLock`), command builders (`getMavenCommand`, `getAtomCommand`, `executeAtom`, `getMillCommand`) | ~1,400 |
 | `core-misc-b.js` | `convertOSQueryResults`, `buildColliderComponent`, `getCppModules`, `addEvidenceForImports`, `addEvidenceForDotnet`, `collectExecutables`/`collectSharedLibs`, `getRuntimeInformation`, remaining runtime/identity helpers | ~1,400 |
 
