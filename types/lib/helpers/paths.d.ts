@@ -14,4 +14,6 @@
  * `https://` URL, and `fileURLToPath` throws `ERR_INVALID_URL_SCHEME` on those.
  */
 export declare const dirNameStr: any;
+export declare const isWin: boolean;
+export declare const isMac: boolean;
 //# sourceMappingURL=paths.d.ts.map

@@ -1,155 +1,14 @@
 import { BLOCKED_HOST_ERROR_CODE, cdxgenAgent, createBlockedHostError, createDryRunError, DEBUG_MODE, DRY_RUN_ERROR_CODE, getRecordedActivities, hasDangerousUnicode, isAllowedHttpHost, isDryRun, isDryRunError, isSecureMode, isSensitiveEnvironmentVariableName, readEnvironmentVariable, recordActivity, recordDecisionActivity, recordDiscoveryActivity, recordEnvironmentRead, recordObservedActivity, recordPolicyActivity, recordSensitiveFileRead, recordSymlinkResolution, remoteHostsAccessed, resetActivityContext, resetRecordedActivities, setActivityContext, setDryRunMode } from "./core-activity.js";
+import { CARGO_CMD, CDXGEN_SPDX_CREATED_BY, CDXGEN_TEMP_DIR, CLJ_CMD, DOTNET_CMD, FETCH_LICENSE, GCC_CMD, GO_CMD, getJavaCommand, getPythonCommand, includeMavenTestScope, isBun, isDeno, isNode, JAVA_CMD, LEIN_CMD, NODE_CMD, NPM_CMD, PACKAGE_MANAGER_ALIASES, PREFER_MAVEN_DEPS_TREE, PROJECT_TYPE_ALIASES, PYTHON_CMD, PYTHON_EXCLUDED_COMPONENTS, parseMavenArgs, RUBY_CMD, RUSTC_CMD, SEARCH_MAVEN_ORG, SWIFT_CMD, shouldFetchLicense, shouldFetchPackageMetadata, shouldFetchVCS, TABLE_BORDER_STYLE, YARN_CMD } from "./core-env.js";
+import { checksumFile, commandsExecuted, getAllFiles, getAllFilesWithIgnore, getTimestamp, getTmpDir, MAX_BUFFER, multiChecksumFile, safeCopyFileSync, safeExistsSync, safeExtractArchive, safeMkdirSync, safeMkdtempSync, safeRmSync, safeSpawnSync, safeUnlinkSync, safeWriteSync, TIMEOUT_MS } from "./core-fs.js";
 import { collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, getJarClasses, getPomPropertiesFromMavenDir, inferJarGroupFromManifest, parseJarManifest, parsePomProperties, parsePomXml, readZipEntry, trimJarGroupSuffix } from "./deps.js";
 import { createNpmWorkspacePurl } from "./npmutils.js";
-import { dirNameStr } from "./paths.js";
+import { dirNameStr, isMac, isWin } from "./paths.js";
 import { encodeForPurl, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, purlFromUrlString } from "./purl.js";
 import { addLicenseText, adjustLicenseInformation, findLicenseId, getKnownLicense, getLicenses, guessLicenseId, isSpdxLicenseExpression, readLicenseText } from "./spdx.js";
 import { CDXGEN_VERSION, frameworksList } from "./state.js";
-export { addLicenseText, adjustLicenseInformation, BLOCKED_HOST_ERROR_CODE, CDXGEN_VERSION, cdxgenAgent, collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, createBlockedHostError, createDryRunError, createNpmWorkspacePurl, DEBUG_MODE, DRY_RUN_ERROR_CODE, dirNameStr, encodeForPurl, findLicenseId, frameworksList, getJarClasses, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, getRecordedActivities, guessLicenseId, hasDangerousUnicode, inferJarGroupFromManifest, isAllowedHttpHost, isDryRun, isDryRunError, isSecureMode, isSensitiveEnvironmentVariableName, isSpdxLicenseExpression, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, parseJarManifest, parsePomProperties, parsePomXml, purlFromUrlString, readEnvironmentVariable, readLicenseText, readZipEntry, recordActivity, recordDecisionActivity, recordDiscoveryActivity, recordEnvironmentRead, recordObservedActivity, recordPolicyActivity, recordSensitiveFileRead, recordSymlinkResolution, remoteHostsAccessed, resetActivityContext, resetRecordedActivities, setActivityContext, setDryRunMode, trimJarGroupSuffix, };
-export declare const isNode: boolean;
-export declare const isBun: boolean;
-export declare const isDeno: boolean;
-export declare const isWin: boolean;
-export declare const isMac: boolean;
-/**
- * Safely check if a file path exists without crashing due to a lack of permissions
- *
- * @param {String} filePath File path
- * @Boolean True if the path exists. False otherwise
- */
-export declare function safeExistsSync(filePath: string): any;
-export declare function safeWriteSync(filePath: any, data: any, options: any): undefined;
-/**
- * Safely create a directory without crashing due to a lack of permissions
- *
- * @param {String} filePath File path
- * @param options {Options} mkdir options
- * @Boolean True if the path exists. False otherwise
- */
-export declare function safeMkdirSync(filePath: string, options: Options): undefined;
-export declare function safeMkdtempSync(prefix: any, options?: undefined): any;
-export declare function safeRmSync(filePath: any, options?: undefined): undefined;
-export declare function safeUnlinkSync(filePath: any): undefined;
-export declare function safeCopyFileSync(src: any, dest: any, mode?: undefined): any;
-export declare function safeExtractArchive(sourcePath: any, targetPath: any, extractor: any, kind?: string, options?: undefined): Promise<boolean>;
-export declare const commandsExecuted: Set<any>;
-/**
- * Safe wrapper around spawnSync that enforces permission checks, injects default
- * options (maxBuffer, encoding, timeout), warns about unsafe Python and pip/uv
- * invocations, and records every executed command in the commandsExecuted set.
- *
- * @param {string} command The executable to spawn
- * @param {string[]} args Arguments to pass to the command
- * @param {Object} options Options forwarded to spawnSync (e.g. cwd, env, shell)
- * @returns {Object} spawnSync result object with status, stdout, stderr, and error fields
- */
-export declare function safeSpawnSync(command: string, args: string[], options: Object): Object;
-export declare const CDXGEN_SPDX_CREATED_BY: any;
-export declare const TABLE_BORDER_STYLE: string;
-export declare const TIMEOUT_MS: number;
-export declare const MAX_BUFFER: number;
+export { addLicenseText, adjustLicenseInformation, BLOCKED_HOST_ERROR_CODE, CARGO_CMD, CDXGEN_SPDX_CREATED_BY, CDXGEN_TEMP_DIR, CDXGEN_VERSION, CLJ_CMD, cdxgenAgent, checksumFile, collectJarNS, collectMvnDependencies, commandsExecuted, componentSorter, convertJarNSToPackages, createBlockedHostError, createDryRunError, createNpmWorkspacePurl, DEBUG_MODE, DOTNET_CMD, DRY_RUN_ERROR_CODE, dirNameStr, encodeForPurl, FETCH_LICENSE, findLicenseId, frameworksList, GCC_CMD, GO_CMD, getAllFiles, getAllFilesWithIgnore, getJarClasses, getJavaCommand, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, getPythonCommand, getRecordedActivities, getTimestamp, getTmpDir, guessLicenseId, hasDangerousUnicode, includeMavenTestScope, inferJarGroupFromManifest, isAllowedHttpHost, isBun, isDeno, isDryRun, isDryRunError, isMac, isNode, isSecureMode, isSensitiveEnvironmentVariableName, isSpdxLicenseExpression, isWin, JAVA_CMD, LEIN_CMD, locateGenericPackage, MAX_BUFFER, mapConanPkgRefToPurlStringAndNameAndVersion, multiChecksumFile, NODE_CMD, NPM_CMD, PACKAGE_MANAGER_ALIASES, PREFER_MAVEN_DEPS_TREE, PROJECT_TYPE_ALIASES, PYTHON_CMD, PYTHON_EXCLUDED_COMPONENTS, parseJarManifest, parseMavenArgs, parsePomProperties, parsePomXml, purlFromUrlString, RUBY_CMD, RUSTC_CMD, readEnvironmentVariable, readLicenseText, readZipEntry, recordActivity, recordDecisionActivity, recordDiscoveryActivity, recordEnvironmentRead, recordObservedActivity, recordPolicyActivity, recordSensitiveFileRead, recordSymlinkResolution, remoteHostsAccessed, resetActivityContext, resetRecordedActivities, SEARCH_MAVEN_ORG, SWIFT_CMD, safeCopyFileSync, safeExistsSync, safeExtractArchive, safeMkdirSync, safeMkdtempSync, safeRmSync, safeSpawnSync, safeUnlinkSync, safeWriteSync, setActivityContext, setDryRunMode, shouldFetchLicense, shouldFetchPackageMetadata, shouldFetchVCS, TABLE_BORDER_STYLE, TIMEOUT_MS, trimJarGroupSuffix, YARN_CMD, };
 export declare let metadata_cache: {};
-export declare const includeMavenTestScope: boolean;
-export declare const PREFER_MAVEN_DEPS_TREE: boolean;
-export declare function parseMavenArgs(argsString: any): string[];
-/**
- * Determines whether license information should be fetched from remote sources,
- * based on the FETCH_LICENSE environment variable.
- *
- * @returns {boolean} True if the FETCH_LICENSE env var is set to "true" or "1"
- */
-export declare function shouldFetchLicense(): boolean;
-/**
- * Determines whether remote package metadata should be fetched for enrichment.
- *
- * @returns {boolean} True when registry metadata enrichment is enabled.
- */
-export declare function shouldFetchPackageMetadata(): boolean;
-/**
- * Determines whether VCS (version control system) information should be fetched
- * for Go packages, based on the GO_FETCH_VCS environment variable.
- *
- * @returns {boolean} True if the GO_FETCH_VCS env var is set to "true" or "1"
- */
-export declare function shouldFetchVCS(): boolean;
-export declare const FETCH_LICENSE: boolean;
-export declare const SEARCH_MAVEN_ORG: boolean;
-export declare const JAVA_CMD: string;
-/**
- * Returns the Java executable command to use, resolved in priority order:
- * JAVA_CMD env var > JAVA_HOME/bin/java > "java".
- *
- * @returns {string} Path or name of the Java executable
- */
-export declare function getJavaCommand(): string;
-export declare const PYTHON_CMD: string;
-/**
- * Returns the Python executable command to use, resolved in priority order:
- * PYTHON_CMD env var > CONDA_PYTHON_EXE env var > "python".
- *
- * @returns {string} Path or name of the Python executable
- */
-export declare function getPythonCommand(): string;
-export declare let DOTNET_CMD: string;
-export declare let NODE_CMD: string;
-export declare let NPM_CMD: string;
-export declare let YARN_CMD: string;
-export declare let GCC_CMD: string;
-export declare let RUSTC_CMD: string;
-export declare let GO_CMD: string;
-export declare let CARGO_CMD: string;
-export declare let CLJ_CMD: string;
-export declare let LEIN_CMD: string;
-export declare let CDXGEN_TEMP_DIR: string;
-export declare const SWIFT_CMD: any;
-export declare const RUBY_CMD: any;
-export declare const PYTHON_EXCLUDED_COMPONENTS: string[];
-export declare const PROJECT_TYPE_ALIASES: {
-    java: string[];
-    android: string[];
-    jar: string[];
-    "gradle-index": string[];
-    "sbt-index": string[];
-    "maven-index": string[];
-    "cargo-cache": string[];
-    js: string[];
-    mcp: string[];
-    "ai-skill": string[];
-    py: string[];
-    go: string[];
-    rust: string[];
-    php: string[];
-    ruby: string[];
-    csharp: string[];
-    dart: string[];
-    haskell: string[];
-    elixir: string[];
-    c: string[];
-    clojure: string[];
-    github: string[];
-    hbom: string[];
-    os: string[];
-    jenkins: string[];
-    helm: string[];
-    "helm-index": string[];
-    universal: string[];
-    cloudbuild: string[];
-    swift: string[];
-    binary: string[];
-    oci: string[];
-    cocoa: string[];
-    scala: string[];
-    nix: string[];
-    caxa: string[];
-    asar: string[];
-    "vscode-extension": string[];
-    "chrome-extension": string[];
-    dynamic: string[];
-    "ai-provenance": string[];
-};
-export declare const PACKAGE_MANAGER_ALIASES: {
-    scala: string[];
-};
 /**
  * Method to check if a given feature flag is enabled.
  *
@@ -200,34 +59,6 @@ export declare function getDefaultBomAuditCategories(options: object, commandPat
  * @returns {Boolean} True if the package manager is allowed
  */
 export declare function isPackageManagerAllowed(name: string, conflictingManagers: any[], options: Object): boolean;
-/**
- * Method to get files matching a pattern
- *
- * @param {string} dirPath Root directory for search
- * @param {string} pattern Glob pattern (eg: *.gradle)
- * @param {Object} options CLI options
- *
- * @returns {Array[string]} List of matched files
- */
-export declare function getAllFiles(dirPath: string, pattern: string, options?: Object): any;
-/**
- * Method to get files matching a pattern
- *
- * @param {string} dirPath Root directory for search
- * @param {string} pattern Glob pattern (eg: *.gradle)
- * @param {Boolean} includeDot whether hidden files can be included.
- * @param {Array} ignoreList Directory patterns to ignore
- *
- * @returns {Array[string]} List of matched files
- */
-export declare function getAllFilesWithIgnore(dirPath: string, pattern: string, includeDot: boolean, ignoreList: any[]): any;
-/**
- * Return the current timestamp in YYYY-MM-DDTHH:MM:SSZ format.
- *
- * @returns {string} ISO formatted timestamp, without milliseconds.
- */
-export declare function getTimestamp(): string;
-export declare function getTmpDir(): any;
 /**
  * Fetches license information for a list of Swift packages by querying the
  * GitHub repository license API for packages hosted on github.com.
@@ -1312,22 +1143,6 @@ export declare function parseSwiftResolved(resolvedFile: string): {
         };
     };
 }[];
-/**
- * Computes the checksum for a file path using the given hash algorithm
- *
- * @param {string} hashName name of hash algorithm
- * @param {string} path path to file
- * @returns {Promise<String>} hex value of hash
- */
-export declare function checksumFile(hashName: string, path: string): Promise<string>;
-/**
- * Computes multiple checksum for a file path using the given hash algorithms
- *
- * @param {Array[String]} algorithms Array of algorithms
- * @param {string} path path to file
- * @returns {Promise<Object>} hashes object
- */
-export declare function multiChecksumFile(algorithms: any, path: string): Promise<Object>;
 /**
  * Method to extract a war or ear file
  *

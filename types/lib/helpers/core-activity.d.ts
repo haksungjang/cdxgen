@@ -59,7 +59,6 @@ export declare function isAllowedHttpHost(hostname: any, allowedHostsEnv?: any):
  * @returns {boolean} true if dangerous Unicode is found
  */
 export declare function hasDangerousUnicode(str: string): boolean;
-declare function hostnameMatches(hostname: any, candidateHost: any): any;
 export declare const cdxgenAgent: Function;
-export { buildReadCountSuffix, classifyActivityPath, classifyDiscoveryPattern, hostnameMatches, recordFilesystemActivity, };
+export { buildReadCountSuffix, classifyActivityPath, classifyDiscoveryPattern, recordFilesystemActivity, };
 //# sourceMappingURL=core-activity.d.ts.map
