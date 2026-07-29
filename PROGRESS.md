@@ -2,4 +2,5 @@
 
 | Deliverable | Commit | utils.js lines | Barrel exports | Gate status |
 |---|---|---|---|---|
-| D1 (barrel test) | (pending) | 18,562 | 261 | 116/1, golden green |
+| D1 (barrel test) | 823225d8 | 18,562 | 261 | 116/1, golden green |
+| D2 (batch 5: ecosystems.js) | 6b941b11 | 16,663 | 261 | 115/2, golden green |
