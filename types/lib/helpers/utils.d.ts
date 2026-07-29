@@ -2,8 +2,8 @@ import { collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPa
 import { createNpmWorkspacePurl } from "./npmutils.js";
 import { encodeForPurl, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, purlFromUrlString } from "./purl.js";
 import { addLicenseText, adjustLicenseInformation, findLicenseId, getKnownLicense, getLicenses, guessLicenseId, isSpdxLicenseExpression, readLicenseText } from "./spdx.js";
-export { addLicenseText, adjustLicenseInformation, collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, createNpmWorkspacePurl, encodeForPurl, findLicenseId, getJarClasses, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, guessLicenseId, inferJarGroupFromManifest, isSpdxLicenseExpression, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, parseJarManifest, parsePomProperties, parsePomXml, purlFromUrlString, readLicenseText, readZipEntry, trimJarGroupSuffix, };
-export declare const dirNameStr: any;
+import { dirNameStr } from "./paths.js";
+export { addLicenseText, adjustLicenseInformation, collectJarNS, collectMvnDependencies, componentSorter, convertJarNSToPackages, createNpmWorkspacePurl, dirNameStr, encodeForPurl, findLicenseId, getJarClasses, getKnownLicense, getLicenses, getPomPropertiesFromMavenDir, guessLicenseId, inferJarGroupFromManifest, isSpdxLicenseExpression, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, parseJarManifest, parsePomProperties, parsePomXml, purlFromUrlString, readLicenseText, readZipEntry, trimJarGroupSuffix, };
 export declare const isSecureMode: any;
 export declare let isDryRun: any;
 export declare const isNode: boolean;

@@ -148,6 +148,7 @@ lib/helpers/npmutils.js
 lib/helpers/osPackageResolver.js
 lib/helpers/osinfo.js
 lib/helpers/osqueryTransform.js
+lib/helpers/paths.js
 lib/helpers/plugins.js
 lib/helpers/propertySanitizer.js
 lib/helpers/protobom.js
@@ -409,6 +410,8 @@ types/lib/helpers/osinfo.d.ts
 types/lib/helpers/osinfo.d.ts.map
 types/lib/helpers/osqueryTransform.d.ts
 types/lib/helpers/osqueryTransform.d.ts.map
+types/lib/helpers/paths.d.ts
+types/lib/helpers/paths.d.ts.map
 types/lib/helpers/plugins.d.ts
 types/lib/helpers/plugins.d.ts.map
 types/lib/helpers/propertySanitizer.d.ts
