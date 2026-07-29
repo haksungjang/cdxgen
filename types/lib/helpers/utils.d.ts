@@ -1,6 +1,7 @@
-import { PackageURL } from "packageurl-js";
 import { createNpmWorkspacePurl } from "./npmutils.js";
+import { encodeForPurl, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, purlFromUrlString } from "./purl.js";
 export { createNpmWorkspacePurl };
+export { encodeForPurl, locateGenericPackage, mapConanPkgRefToPurlStringAndNameAndVersion, purlFromUrlString };
 export declare const dirNameStr: any;
 export declare const isSecureMode: any;
 export declare let isDryRun: any;
@@ -1082,17 +1083,6 @@ export declare function parseGitHubWorkflowData(f: string): Object[];
  */
 export declare function parseCloudBuildData(cbwData: string): Object[];
 /**
- * Map a Conan package reference string to a PackageURL string, name, and version.
- *
- * Parses a full Conan package reference of the form
- * `name/version@user/channel#recipe_revision:package_id#package_revision`
- * and returns the equivalent purl string together with the extracted name and version.
- *
- * @param {string} conanPkgRef Conan package reference string
- * @returns {Array} Tuple of [purlString, name, version], or [null, null, null] on parse failure
- */
-export declare function mapConanPkgRefToPurlStringAndNameAndVersion(conanPkgRef: string): any[];
-/**
  * Parse Conan lock file data (conan.lock) and return the package list, dependency map,
  * and parent component dependencies.
  *
@@ -1368,18 +1358,6 @@ export declare function convertOSQueryResults(queryCategory: string, queryObj: O
     type: any;
 }[];
 /**
- * Create a PackageURL object from a repository URL string, package type, and version.
- *
- * Supports HTTPS URLs, SSH `git@` URLs, Bitbucket SSH URLs, and local paths.
- * Extracts the namespace (host + path prefix) and repository name from the URL.
- *
- * @param {string} type PackageURL type (e.g. `"swift"`, `"generic"`)
- * @param {string} repoUrl Repository URL string
- * @param {string} version Package version
- * @returns {PackageURL|undefined} PackageURL object, or undefined for unsupported URL formats
- */
-export declare function purlFromUrlString(type: string, repoUrl: string, version: string): PackageURL | undefined;
-/**
  * Parse swift dependency tree output json object
  *
  * @param {Array} pkgList Package list
@@ -1494,14 +1472,6 @@ export declare function trimJarGroupSuffix(group: string, name: string): string;
  * @returns {Object} Key-value pairs extracted from the properties file
  */
 export declare function parsePomProperties(pomProperties: string): Object;
-/**
- * Encode a string for safe inclusion in a PackageURL, percent-encoding special characters
- * while preserving already-encoded `%40` sequences and keeping `:` and `/` unencoded.
- *
- * @param {string} s String to encode
- * @returns {string} Encoded string suitable for use in a PackageURL component
- */
-export declare function encodeForPurl(s: string): string;
 /**
  * Method to get pom properties from maven directory
  *
@@ -1804,14 +1774,6 @@ export declare function getCppModules(src: string, options: object, osPkgsList: 
         dependsOn: any[];
     }[];
 };
-/**
- * NOT IMPLEMENTED YET.
- * A future method to locate a generic package given some name and properties
- *
- * @param {object} apkg Package to locate
- * @returns Located project with precise purl or the original unmodified input.
- */
-export declare function locateGenericPackage(apkg: object): object;
 export declare function parseCUsageSlice(sliceData: any): {} | undefined;
 /**
  * Method to retrieve metadata for nuget packages

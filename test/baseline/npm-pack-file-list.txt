@@ -152,6 +152,7 @@ lib/helpers/propertySanitizer.js
 lib/helpers/protobom.js
 lib/helpers/protobomLoader.js
 lib/helpers/provenanceUtils.js
+lib/helpers/purl.js
 lib/helpers/pylockutils.js
 lib/helpers/pythonutils.js
 lib/helpers/registryProvenance.js
@@ -414,6 +415,8 @@ types/lib/helpers/protobomLoader.d.ts
 types/lib/helpers/protobomLoader.d.ts.map
 types/lib/helpers/provenanceUtils.d.ts
 types/lib/helpers/provenanceUtils.d.ts.map
+types/lib/helpers/purl.d.ts
+types/lib/helpers/purl.d.ts.map
 types/lib/helpers/pylockutils.d.ts
 types/lib/helpers/pylockutils.d.ts.map
 types/lib/helpers/pythonutils.d.ts
