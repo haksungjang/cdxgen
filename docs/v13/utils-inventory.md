@@ -76,11 +76,11 @@ checked against the tree **as it will be at that moment**, not the final graph.
 |---|---|---|
 | 1 | `lib/helpers/purl.js` | purl build/parse, version compare, conan/nix purl helpers |
 | 2 | `lib/helpers/spdx.js` | license-id normalisation, SPDX expressions, license data lookup |
-| 3 | `lib/helpers/core-helpers.js` (+ `core-fs.js`) | path/file/hash/string utils, safe wrappers, activity/dry-run/host-allowlist, env/runtime/command resolution, feature flags |
+| 3 | `lib/helpers/core-activity.js/core-fs.js/core-env.js` (+ `core-fs.js`) | path/file/hash/string utils, safe wrappers, activity/dry-run/host-allowlist, env/runtime/command resolution, feature flags |
 | 4 | `lib/helpers/deps.js` | dependency-tree assembly, component merge/dedupe, JAR namespace collection |
 | 5 | `lib/helpers/ecosystems.js` | the `get*Metadata` family + registry fetch helpers |
 | 6 | `lib/helpers/parsers-<ecosystem>.js` | the `parse*` family, grouped per ecosystem (see §6) |
-| 7 | `lib/helpers/core-helpers.js` (cont.) | residual core that resisted earlier classification |
+| 7 | `lib/helpers/core-activity.js/core-fs.js/core-env.js` (cont.) | residual core that resisted earlier classification |
 
 **Types requirement (round-2 review):** `exports["./helpers/*"]` maps `types` to
 `./types/lib/helpers/*.d.ts`, `types/` is committed, and
@@ -150,7 +150,7 @@ they move as plain constants.
 | `CDXGEN_TEMP_DIR` | `export let` | 1793 | L1794–1796 from `process.env.CDXGEN_TEMP_DIR` | core/env |
 
 All eleven land in `core-env.js` (the env/command-resolution leaf of the
-former `core-helpers.js` cluster) and are re-exported by the barrel.
+former `core-activity.js` / `core-fs.js` / `core-env.js` cluster) and are re-exported by the barrel.
 
 ### 3a-3. Frozen-after-init config constants (`const Set`/`Map`, never mutated)
 
@@ -178,8 +178,8 @@ Each moves with the cluster that uses it; no cross-cluster hazard.
 | Binding | Kind | Line | Problem | Proposed resolution |
 |---|---|---|---|---|
 | `metadata_cache` | `export let` **(reassigned)** | 1580 | Read/written by ecosystem funcs (`getNpmMetadata`, `getGoPkgLicense`, `getGoPkgVCSUrl`, `getNugetMetadata`) **and** reassigned (`= {}`) by `parseGoModData` (a parser). ESM forbids reassigning an imported binding, so the reassigner must live in the declaring module. | **Declare `metadata_cache` in `ecosystems.js`** alongside its primary users. Export a `_clearMetadataCache()` helper — **internal, NOT in the barrel's 261 public names**. `parseGoModData` (batch 6) imports `metadata_cache` (read) + `_clearMetadataCache` and calls the helper instead of `metadata_cache = {}`. **One-line mechanical adaptation at L10788**, documented in §7. |
-| `cdxgenAgent` | `export const` | 2324 | Single HTTP client instance built via `createHttpClient`. Its `beforeRequest`/`afterResponse`/`beforeError` hooks close over `isDryRun`, `remoteHostsAccessed`, `recordActivity`, `recordPolicyActivity`, `inferNetworkIntent`, `isAllowedHttpHost`, `createDryRunError`, `createBlockedHostError`, `readEnvironmentVariable`, `traceLog`. Used by ~12 ecosystem/parser funcs. Two instances ⇒ two connection pools + two caches. | **Build `cdxgenAgent` in `core-helpers.js`** (with the activity/host-allowlist cluster it closes over). Ecosystem/parser modules import the single instance from there. The D04 cassette layer intercepts inside `httpClient.js`'s `doRequest`, so replay keeps working as long as there is one agent. |
-| `remoteHostsAccessed` | `export Set` | 2249 | Written only by the `cdxgenAgent` `beforeRequest` hook; read externally by 1 importer. | Stays with `cdxgenAgent` in `core-helpers.js`. |
+| `cdxgenAgent` | `export const` | 2324 | Single HTTP client instance built via `createHttpClient`. Its `beforeRequest`/`afterResponse`/`beforeError` hooks close over `isDryRun`, `remoteHostsAccessed`, `recordActivity`, `recordPolicyActivity`, `inferNetworkIntent`, `isAllowedHttpHost`, `createDryRunError`, `createBlockedHostError`, `readEnvironmentVariable`, `traceLog`. Used by ~12 ecosystem/parser funcs. Two instances ⇒ two connection pools + two caches. | **Build `cdxgenAgent` in `core-activity.js` / `core-fs.js` / `core-env.js`** (with the activity/host-allowlist cluster it closes over). Ecosystem/parser modules import the single instance from there. The D04 cassette layer intercepts inside `httpClient.js`'s `doRequest`, so replay keeps working as long as there is one agent. |
+| `remoteHostsAccessed` | `export Set` | 2249 | Written only by the `cdxgenAgent` `beforeRequest` hook; read externally by 1 importer. | Stays with `cdxgenAgent` in `core-activity.js` / `core-fs.js` / `core-env.js`. |
 | `temporaryFiles` | `const Set` | 1585 | Written by `fullScanCocoaPod` (a cocoa helper). Has a `process.on("exit", …)` cleanup handler at L1586–1592 that calls `safeExistsSync`/`safeUnlinkSync`. | The binding + exit handler stay in **`core-fs.js`** (with the `safe*` wrappers the handler calls). `fullScanCocoaPod` (batch 7, `core-misc.js`) imports the `const` Set reference — safe because it is mutated, never reassigned. |
 
 ### 3c. Per-binding singleness guarantee (definition-of-done checklist)
@@ -246,13 +246,13 @@ through**.
 
 | Edge | Direction | Notes |
 |---|---|---|
-| `purl.js` → `core-helpers.js` | one-way | purl is a leaf utility |
-| `spdx.js` → `core-helpers.js` | one-way | |
-| `core-fs.js` → `core-helpers.js` | one-way | safe wrappers use activity/dry-run state |
-| `deps.js` → `core-helpers.js` | one-way | |
-| `ecosystems.js` → `deps.js`, `core-helpers.js` | one-way | deps extracted first |
-| `parsers-*.js` → `ecosystems.js`, `deps.js`, `core-helpers.js` | one-way | all targets extracted first |
-| `core-helpers.js` → parsers/ecosystems | **must not happen** | core is a leaf |
+| `purl.js` → `core-activity.js` / `core-fs.js` / `core-env.js` | one-way | purl is a leaf utility |
+| `spdx.js` → `core-activity.js` / `core-fs.js` / `core-env.js` | one-way | |
+| `core-fs.js` → `core-activity.js` / `core-fs.js` / `core-env.js` | one-way | safe wrappers use activity/dry-run state |
+| `deps.js` → `core-activity.js` / `core-fs.js` / `core-env.js` | one-way | |
+| `ecosystems.js` → `deps.js`, `core-activity.js` / `core-fs.js` / `core-env.js` | one-way | deps extracted first |
+| `parsers-*.js` → `ecosystems.js`, `deps.js`, `core-activity.js` / `core-fs.js` / `core-env.js` | one-way | all targets extracted first |
+| `core-activity.js` / `core-fs.js` / `core-env.js` → parsers/ecosystems | **must not happen** | core is a leaf |
 | barrel `utils.js` re-exports from all new modules | new modules import siblings directly, never `./utils.js` | re-exports don't access values at eval time |
 
 **Verification gate (per batch):** after creating each new module, run
@@ -271,7 +271,7 @@ Caller counts are files under `lib/`+`bin/` (excluding `*.poku.js` and
 
 | Target | Exported funcs | Notable `const`/value exports | Approx lines |
 |---|---|---|---|
-| `core-helpers.js` | 90 | `DEBUG_MODE`, `dirNameStr`, `isSecureMode`, `isDryRun`, `isNode`, `isBun`, `isDeno`, `isWin`, `isMac`, `CDXGEN_VERSION`, `TIMEOUT_MS`, `MAX_BUFFER`, `cdxgenAgent`, `commandsExecuted`, `remoteHostsAccessed`, `metadata_cache`→no(see §3b), `PROJECT_TYPE_ALIASES`, `PACKAGE_MANAGER_ALIASES`, `FETCH_LICENSE`, `SEARCH_MAVEN_ORG`, `PYTHON_EXCLUDED_COMPONENTS`, `*_CMD` (JAVA/PYTHON/DOTNET/NODE/NPM/YARN/GCC/RUSTC/GO/CARGO/CLJ/LEIN/SWIFT/RUBY), `TABLE_BORDER_STYLE`, `CDXGEN_SPDX_CREATED_BY`, `includeMavenTestScope`, `PREFER_MAVEN_DEPS_TREE`, `DRY_RUN_ERROR_CODE`, `BLOCKED_HOST_ERROR_CODE`, `CDXGEN_TEMP_DIR`, `frameworksList` | ~8,250 (split internally, see §6) |
+| `core-activity.js` / `core-fs.js` / `core-env.js` | 90 | `DEBUG_MODE`, `dirNameStr`, `isSecureMode`, `isDryRun`, `isNode`, `isBun`, `isDeno`, `isWin`, `isMac`, `CDXGEN_VERSION`, `TIMEOUT_MS`, `MAX_BUFFER`, `cdxgenAgent`, `commandsExecuted`, `remoteHostsAccessed`, `metadata_cache`→no(see §3b), `PROJECT_TYPE_ALIASES`, `PACKAGE_MANAGER_ALIASES`, `FETCH_LICENSE`, `SEARCH_MAVEN_ORG`, `PYTHON_EXCLUDED_COMPONENTS`, `*_CMD` (JAVA/PYTHON/DOTNET/NODE/NPM/YARN/GCC/RUSTC/GO/CARGO/CLJ/LEIN/SWIFT/RUBY), `TABLE_BORDER_STYLE`, `CDXGEN_SPDX_CREATED_BY`, `includeMavenTestScope`, `PREFER_MAVEN_DEPS_TREE`, `DRY_RUN_ERROR_CODE`, `BLOCKED_HOST_ERROR_CODE`, `CDXGEN_TEMP_DIR`, `frameworksList` | ~8,250 (split internally, see §6) |
 | `parsers-<eco>.js` | 84 | — | ~9,670 (split per ecosystem, see §6) |
 | `ecosystems.js` | 18 | — | ~1,566 |
 | `spdx.js` | 13 | — | ~531 |
@@ -435,7 +435,7 @@ Exports: `encodeForPurl`, `purlFromUrlString`, `locateGenericPackage`,
 helpers (`generateNixPurl`, `createConanPurlString`, `createPurlTemplate`,
 `cargoPackageInfoToPurl`, `mapConanPkgRefToPurlStringAndNameAndVersion`).
 
-No mutable state. Depends only on `PackageURL` + `core-helpers` utilities.
+No mutable state. Depends only on `PackageURL` + `core-activity.js` / `core-fs.js` / `core-env.js` utilities.
 **Lowest risk; lands first.**
 
 ### Batch 2 — `lib/helpers/spdx.js` (~531 lines)
@@ -456,7 +456,7 @@ construction **plus** safe wrappers **plus** path/file/hash/string helpers
 commits (one per sub-file) so each stays independently green:
 
 > **Rename note.** The plan originally called this single file
-> `core-helpers.js`. It never materialised as one file: during implementation
+> `core-activity.js` / `core-fs.js` / `core-env.js`. It never materialised as one file: during implementation
 > the cluster was decomposed into four leaf modules — `state.js`,
 > `core-activity.js`, `core-fs.js`, and `core-env.js` — plus the future
 > `core-misc-a.js` / `core-misc-b.js`. The `core-env.js` name (batches 3a/3b/3c
@@ -528,10 +528,12 @@ The `parse*` family grouped by ecosystem to keep each file < ~1,500 lines:
 > **Batch 6 is the largest and may be deferred** (see §9). Batches 1–4 are the
 > priority per the deliverable's "land fewer batches, fully" guidance.
 
-### Batch 7 — residual `core-helpers.js`
+### Batch 7 — residual `core-misc-a.js` / `core-misc-b.js`
 
 Whatever remains after batches 1–6, with a per-function note on why it resisted
 classification. Expected to be small command-builder and OS-query helpers.
+Split into `core-misc-a.js` (cocoa/pod/python-tree/command-builders) and
+`core-misc-b.js` (osquery/cpp/evidence/runtime).
 
 ---
 
