@@ -163,6 +163,7 @@ lib/helpers/rusi.js
 lib/helpers/rustFormulationParser.js
 lib/helpers/sbtutils.js
 lib/helpers/source.js
+lib/helpers/spdx.js
 lib/helpers/spdxExpression.js
 lib/helpers/spdxUtils.js
 lib/helpers/table.js
@@ -437,6 +438,8 @@ types/lib/helpers/sbtutils.d.ts
 types/lib/helpers/sbtutils.d.ts.map
 types/lib/helpers/source.d.ts
 types/lib/helpers/source.d.ts.map
+types/lib/helpers/spdx.d.ts
+types/lib/helpers/spdx.d.ts.map
 types/lib/helpers/spdxExpression.d.ts
 types/lib/helpers/spdxExpression.d.ts.map
 types/lib/helpers/spdxUtils.d.ts
